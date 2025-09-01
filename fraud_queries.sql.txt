@@ -9,3 +9,7 @@ WHERE txn_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
 GROUP BY customer_id
 HAVING txn_count > 3;
 
+CREATE VIEW HighValueTxns AS
+SELECT customer_id, txn_amount, txn_date
+FROM Transactions
+WHERE txn_amount > 4000;
