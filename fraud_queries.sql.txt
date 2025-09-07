@@ -1,15 +1,83 @@
-SELECT customer_id, txn_amount, txn_date 
-FROM Transactions
-WHERE txn_amount > 4000;
+# Query 1: Detect multiple claims for the same visit
+SELECT v.visit_id, COUNT(c.claim_id) AS claim_count
+FROM visits v
+JOIN claims c ON v.visit_id = c.visit_id
+GROUP BY v.visit_id
+HAVING COUNT(c.claim_id) > 1;
 
--- Multiple transactions in a short time
-SELECT customer_id, COUNT(*) AS txn_count
-FROM Transactions
-WHERE txn_date >= DATE_SUB(CURDATE(), INTERVAL 7 DAY)
-GROUP BY customer_id
-HAVING txn_count > 3;
+# Query 2: Claims are much higher than the actual bill
+SELECT c.claim_id, v.total_bill, c.claim_amount
+FROM claims c
+JOIN visits v ON c.visit_id = v.visit_id
+WHERE c.claim_amount > v.total_bill * 1.5;
 
-CREATE VIEW HighValueTxns AS
-SELECT customer_id, txn_amount, txn_date
-FROM Transactions
-WHERE txn_amount > 4000;
+# Query 3: Patients visiting too frequently
+SELECT patient_id, COUNT(*) AS visits_count
+FROM visits
+GROUP BY patient_id
+HAVING COUNT(*) > 10;
+
+# Query 4: Doctors overbilling consistently
+SELECT d.doctor_id, d.name, AVG(v.total_bill) AS avg_bill
+FROM doctors d
+JOIN visits v ON d.doctor_id = v.doctor_id
+GROUP BY d.doctor_id
+HAVING AVG(v.total_bill) > 5000;
+
+# Query 5: Claims approved instantly (same day)
+SELECT c.claim_id, v.visit_date, c.claim_date
+FROM claims c
+JOIN visits v ON c.visit_id = v.visit_id
+WHERE DATEDIFF(c.claim_date, v.visit_date) = 0 AND c.status = 'APPROVED';
+
+# Query 6: Same patient, multiple doctors, same day
+SELECT v.patient_id, v.visit_date, COUNT(DISTINCT v.doctor_id) AS doctor_count
+FROM visits v
+GROUP BY v.patient_id, v.visit_date
+HAVING COUNT(DISTINCT v.doctor_id) > 3;
+
+# Query 7: Same doctor, abnormally high patient load per day
+SELECT doctor_id, visit_date, COUNT(*) AS patient_count
+FROM visits
+GROUP BY doctor_id, visit_date
+HAVING COUNT(*) > 20;
+
+# Query 8: Claims rejected repeatedly for same patient
+SELECT v.patient_id, COUNT(*) AS rejected_claims
+FROM claims c
+JOIN visits v ON c.visit_id = v.visit_id
+WHERE c.status = 'REJECTED'
+GROUP BY v.patient_id
+HAVING COUNT(*) > 5;
+
+# Query 9: Patients with no valid insurance but making claims
+SELECT p.patient_id, p.name, c.claim_id
+FROM patients p
+JOIN visits v ON p.patient_id = v.patient_id
+JOIN claims c ON v.visit_id = c.visit_id
+WHERE p.insurance_id IS NULL;
+
+# Query 10: Suspiciously high claim-to-bill ratio per patient
+SELECT v.patient_id, SUM(c.claim_amount)/SUM(v.total_bill) AS ratio
+FROM visits v
+JOIN claims c ON v.visit_id = c.visit_id
+GROUP BY v.patient_id
+HAVING ratio > 2;
+
+# 4. Views
+
+# View: Approved claims summary
+CREATE VIEW approved_claims_summary AS
+SELECT d.name AS doctor_name, p.name AS patient_name, v.visit_date, v.total_bill, c.claim_amount
+FROM claims c
+JOIN visits v ON c.visit_id = v.visit_id
+JOIN patients p ON v.patient_id = p.patient_id
+JOIN doctors d ON v.doctor_id = d.doctor_id
+WHERE c.status = 'APPROVED';
+
+# View: Suspicious claims (claim amount > 2x bill)
+CREATE VIEW suspicious_claims AS
+SELECT c.claim_id, v.total_bill, c.claim_amount
+FROM claims c
+JOIN visits v ON c.visit_id = v.visit_id
+WHERE c.claim_amount > v.total_bill * 2;
