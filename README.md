@@ -6,7 +6,6 @@ Features:
 - Detects duplicate transactions
 - Flags high-value anomalies
 - Finds accounts with suspicious activity
-- Stored procedures for automated fraud checks
 - Views for executive dashboards
 
  How to Run:
